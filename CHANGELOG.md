@@ -18,6 +18,8 @@
 ### Added
 
 - Developer Portal dan API reference interaktif.
+- Seeder idempotent untuk akun development Manajer Kasus dan Paralegal yang
+  bersumber dari data pengguna contoh MokaV2.
 - Endpoint health, integration identity, dan echo.
 - Registri institution, integration client, external actor, scope, dan identity provider.
 - Dokumentasi onboarding, authentication, governance, lifecycle, dan kamus data.
