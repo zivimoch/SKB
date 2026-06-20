@@ -12,6 +12,8 @@
   batas indeks InnoDB 767 byte.
 - Menyimpan dokumen JSON sebagai `LONGTEXT` agar migration dapat berjalan pada
   MySQL/MariaDB lama yang belum memiliki tipe kolom native `JSON`.
+- Membuat timestamp yang diisi aplikasi bersifat nullable pada level skema untuk
+  kompatibilitas MySQL lama yang menolak `TIMESTAMP NOT NULL` tanpa default.
 
 ### Added
 

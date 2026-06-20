@@ -27,7 +27,7 @@ return new class extends Migration
             $table->unsignedInteger('active_intervention_cycle')->default(1);
             $table->char('payload_hash', 64);
             $table->timestamp('source_updated_at')->nullable();
-            $table->timestamp('last_synced_at');
+            $table->timestamp('last_synced_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
             $table->unique(['source_system', 'source_id']);
@@ -138,7 +138,7 @@ return new class extends Migration
             $table->string('ip_hash', 64)->nullable();
             $table->char('request_hash', 64)->nullable();
             $table->longText('metadata')->nullable();
-            $table->timestamp('occurred_at');
+            $table->timestamp('occurred_at')->nullable();
             $table->index(['resource_type', 'resource_id']);
             $table->index('occurred_at');
         });

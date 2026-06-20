@@ -42,8 +42,8 @@ return new class extends Migration
             $table->string('role', 100)->nullable();
             $table->string('institution_name')->nullable();
             $table->boolean('active')->default(true);
-            $table->timestamp('first_seen_at');
-            $table->timestamp('last_seen_at');
+            $table->timestamp('first_seen_at')->nullable();
+            $table->timestamp('last_seen_at')->nullable();
             $table->timestamps();
             $table->unique(['integration_client_id', 'external_id']);
         });
