@@ -66,6 +66,21 @@ class IntegrationCaseApiTest extends TestCase
         $this->assertDatabaseCount('hub_cases', 1);
     }
 
+    public function test_post_sync_endpoint_supports_waf_that_blocks_put(): void
+    {
+        $response = $this->signedPost(
+            'client-post-1',
+            $this->payload(),
+            'test-idempotency-post-0001'
+        );
+
+        $response->assertCreated()->assertJsonPath('data.source_id', 'client-post-1');
+        $this->assertDatabaseHas('hub_cases', [
+            'source_system' => 'mokav2',
+            'source_id' => 'client-post-1',
+        ]);
+    }
+
     public function test_replayed_nonce_and_invalid_signature_are_rejected(): void
     {
         $payload = $this->payload();
@@ -101,6 +116,22 @@ class IntegrationCaseApiTest extends TestCase
         );
 
         return $this->call('PUT', $path, [], [], [], $this->server($headers), $body);
+    }
+
+    private function signedPost(string $externalId, array $payload, string $idempotencyKey)
+    {
+        $body = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        $path = '/api/v1/integrations/cases/'.$externalId.'/sync';
+        $headers = $this->headers(
+            'POST',
+            $path,
+            $body,
+            $idempotencyKey,
+            (string) time(),
+            (string) Str::uuid()
+        );
+
+        return $this->call('POST', $path, [], [], [], $this->server($headers), $body);
     }
 
     private function headers(

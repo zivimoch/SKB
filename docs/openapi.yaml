@@ -113,10 +113,13 @@ paths:
       tags: [Cases]
       operationId: upsertCaseBundle
       summary: Membuat atau memperbarui snapshot kasus
+      deprecated: true
       description: |
         Membutuhkan scope `cases:write`. `sync_scope=full` mengganti seluruh
         snapshot termasuk intervensi. `sync_scope=case_profile` hanya mengganti
-        identifikasi, pihak terkait, riwayat kejadian, dan asesmen.
+        identifikasi, pihak terkait, riwayat kejadian, dan asesmen. Gunakan
+        endpoint POST `/integrations/cases/{externalCaseId}/sync` apabila
+        jaringan atau WAF memblokir metode PUT.
       security: [{ signedRequest: [] }]
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -165,6 +168,46 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /integrations/cases/{externalCaseId}/sync:
+    parameters:
+      - name: externalCaseId
+        in: path
+        required: true
+        description: ID kasus/klien yang stabil pada aplikasi sumber.
+        schema: { type: string, maxLength: 191 }
+      - $ref: '#/components/parameters/KeyId'
+      - $ref: '#/components/parameters/Timestamp'
+      - $ref: '#/components/parameters/Nonce'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/ActorId'
+      - $ref: '#/components/parameters/ActorName'
+      - $ref: '#/components/parameters/ActorRole'
+      - $ref: '#/components/parameters/ActorInstitution'
+    post:
+      tags: [Cases]
+      operationId: syncCaseBundle
+      summary: Membuat atau memperbarui snapshot kasus melalui POST
+      description: |
+        Endpoint utama untuk jaringan yang memblokir metode PUT. Keamanan,
+        scope `cases:write`, signature HMAC, anti-replay, dan idempotency sama
+        dengan endpoint PUT.
+      security: [{ signedRequest: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CaseBundle'
+      responses:
+        '200': { description: Snapshot diperbarui }
+        '201': { description: Snapshot dibuat }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
 components:
   securitySchemes:
     signedRequest:

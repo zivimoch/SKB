@@ -10,6 +10,8 @@ Route::prefix('v1')->middleware(['integration.signature', 'throttle:integration'
         ->middleware('integration.scope:connection:test');
     Route::post('/integrations/echo', [ConnectivityController::class, 'echo'])
         ->middleware('integration.scope:connection:test');
+    Route::post('/integrations/cases/{externalCaseId}/sync', [IntegrationCaseController::class, 'upsert'])
+        ->middleware('integration.scope:cases:write');
     Route::put('/integrations/cases/{externalCaseId}', [IntegrationCaseController::class, 'upsert'])
         ->middleware('integration.scope:cases:write');
     Route::get('/integrations/cases/{externalCaseId}', [IntegrationCaseController::class, 'show'])

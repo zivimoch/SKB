@@ -37,7 +37,10 @@ class VerifyIntegrationSignature
             return $this->deny($request, 'Nonce request tidak valid.');
         }
 
-        if ($request->isMethod('PUT') && ! preg_match('/^[A-Za-z0-9._:-]{16,128}$/', $idempotencyKey)) {
+        $changesCaseData = $request->isMethod('PUT')
+            || ($request->isMethod('POST') && $request->is('api/v1/integrations/cases/*/sync'));
+
+        if ($changesCaseData && ! preg_match('/^[A-Za-z0-9._:-]{16,128}$/', $idempotencyKey)) {
             return response()->json(['message' => 'Idempotency-Key wajib untuk request perubahan data.'], 422);
         }
 

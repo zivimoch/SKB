@@ -20,6 +20,8 @@
 - Developer Portal dan API reference interaktif.
 - Seeder idempotent untuk akun development Manajer Kasus dan Paralegal yang
   bersumber dari data pengguna contoh MokaV2.
+- Endpoint `POST /api/v1/integrations/cases/{externalCaseId}/sync` sebagai
+  alternatif aman untuk jaringan yang memblokir metode HTTP `PUT`.
 - Endpoint health, integration identity, dan echo.
 - Registri institution, integration client, external actor, scope, dan identity provider.
 - Dokumentasi onboarding, authentication, governance, lifecycle, dan kamus data.
