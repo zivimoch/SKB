@@ -8,6 +8,8 @@
   kompatibilitas deployment CentOS yang menjalankan PHP 8.2.
 - Menyesuaikan PHPUnit ke versi 11 dan menghapus `laravel/pao` yang membutuhkan
   PHP 8.3.
+- Menambahkan kompatibilitas indeks `utf8mb4` untuk MySQL/MariaDB lama dengan
+  batas indeks InnoDB 767 byte.
 
 ### Added
 

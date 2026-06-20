@@ -37,7 +37,7 @@ return new class extends Migration
         Schema::create('external_actors', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->foreignUuid('integration_client_id')->constrained('integration_clients')->cascadeOnDelete();
-            $table->string('external_id', 191);
+            $table->string('external_id', 128);
             $table->string('name')->nullable();
             $table->string('role', 100)->nullable();
             $table->string('institution_name')->nullable();

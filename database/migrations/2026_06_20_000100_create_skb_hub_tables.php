@@ -10,8 +10,8 @@ return new class extends Migration
     {
         Schema::create('hub_cases', function (Blueprint $table): void {
             $table->uuid('id')->primary();
-            $table->string('source_system', 64);
-            $table->string('source_id', 191);
+            $table->string('source_system', 32);
+            $table->string('source_id', 128);
             $table->string('source_version', 100)->nullable();
             $table->string('registration_number')->nullable();
             $table->string('client_number')->nullable();
@@ -74,7 +74,7 @@ return new class extends Migration
         Schema::create('intervention_activities', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->foreignUuid('cycle_id')->constrained('intervention_cycles')->cascadeOnDelete();
-            $table->string('source_id', 191);
+            $table->string('source_id', 128);
             $table->longText('title_encrypted');
             $table->date('scheduled_date')->nullable();
             $table->time('scheduled_time')->nullable();
@@ -85,7 +85,7 @@ return new class extends Migration
         Schema::create('intervention_reports', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->foreignUuid('activity_id')->constrained('intervention_activities')->cascadeOnDelete();
-            $table->string('source_id', 191);
+            $table->string('source_id', 128);
             $table->string('officer_source_id', 191)->nullable();
             $table->string('status', 30);
             $table->longText('content_encrypted');
@@ -116,8 +116,8 @@ return new class extends Migration
 
         Schema::create('integration_receipts', function (Blueprint $table): void {
             $table->uuid('id')->primary();
-            $table->string('client_key_id', 100);
-            $table->string('idempotency_key', 128);
+            $table->string('client_key_id', 64);
+            $table->string('idempotency_key', 120);
             $table->char('request_hash', 64);
             $table->unsignedSmallInteger('response_status');
             $table->json('response_body');
@@ -130,8 +130,8 @@ return new class extends Migration
             $table->string('actor_type', 50);
             $table->string('actor_id', 191);
             $table->string('action', 100);
-            $table->string('resource_type', 100);
-            $table->string('resource_id', 191)->nullable();
+            $table->string('resource_type', 64);
+            $table->string('resource_id', 127)->nullable();
             $table->string('request_id', 128)->nullable();
             $table->string('ip_hash', 64)->nullable();
             $table->char('request_hash', 64)->nullable();
