@@ -1,0 +1,20 @@
+{
+    "folders": [
+        {
+            "name": "SKB",
+            "path": "."
+        },
+        {
+            "name": "MokaV2",
+            "path": "../mokav2"
+        }
+    ],
+    "settings": {
+        "files.exclude": {
+            "**/.git": true,
+            "**/vendor": true,
+            "**/node_modules": true
+        },
+        "php.validate.executablePath": "/usr/bin/php8.3"
+    }
+}

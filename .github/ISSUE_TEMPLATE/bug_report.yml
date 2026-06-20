@@ -1,0 +1,31 @@
+name: Laporan bug
+description: Laporkan perilaku aplikasi yang tidak sesuai tanpa menyertakan data rahasia.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Jangan menyertakan nama korban, pelapor, terlapor, token, secret, atau data kasus nyata.
+  - type: textarea
+    id: description
+    attributes:
+      label: Deskripsi
+      description: Jelaskan masalah menggunakan data fiktif.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Cara mereproduksi
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Hasil yang diharapkan
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versi atau commit

@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - uses: ramsey/composer-install@v3
+
+      - name: Prepare application
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Check code style
+        run: vendor/bin/pint --test
+
+      - name: Run tests
+        run: php artisan test
+
+      - name: Validate OpenAPI and Postman JSON
+        run: |
+          php -r "json_decode(file_get_contents('postman/SKB-Partner-API.postman_collection.json'), true, 512, JSON_THROW_ON_ERROR);"
+          php -r "if (!str_starts_with(file_get_contents('docs/openapi.yaml'), 'openapi: 3.1.0')) exit(1);"

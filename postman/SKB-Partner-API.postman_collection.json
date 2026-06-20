@@ -1,0 +1,46 @@
+{
+  "info": {
+    "name": "SKB Partner API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "base_url", "value": "http://127.0.0.1:8000"},
+    {"key": "key_id", "value": "moka-v1"},
+    {"key": "secret", "value": "SET_IN_LOCAL_POSTMAN_ONLY"},
+    {"key": "external_case_id", "value": "sandbox-case-001"}
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {"method": "GET", "url": "{{base_url}}/api/v1/health"}
+    },
+    {
+      "name": "Integration Me",
+      "event": [{
+        "listen": "prerequest",
+        "script": {"exec": [
+          "const method = 'GET';",
+          "const path = '/api/v1/integrations/me';",
+          "const timestamp = Math.floor(Date.now()/1000).toString();",
+          "const nonce = pm.variables.replaceIn('{{$guid}}');",
+          "const bodyHash = CryptoJS.SHA256('').toString();",
+          "const canonical = [method,path,'',timestamp,nonce,'',bodyHash].join('\\n');",
+          "const signature = CryptoJS.enc.Base64.stringify(CryptoJS.HmacSHA256(canonical, pm.collectionVariables.get('secret')));",
+          "pm.variables.set('timestamp', timestamp); pm.variables.set('nonce', nonce); pm.variables.set('signature', signature);"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "header": [
+          {"key": "X-SKB-Key-Id", "value": "{{key_id}}"},
+          {"key": "X-SKB-Timestamp", "value": "{{timestamp}}"},
+          {"key": "X-SKB-Nonce", "value": "{{nonce}}"},
+          {"key": "X-SKB-Signature", "value": "{{signature}}"},
+          {"key": "X-Request-Id", "value": "{{$guid}}"},
+          {"key": "X-SKB-Actor-Id", "value": "sandbox-user-001"}
+        ],
+        "url": "{{base_url}}/api/v1/integrations/me"
+      }
+    }
+  ]
+}

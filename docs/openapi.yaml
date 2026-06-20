@@ -1,0 +1,325 @@
+openapi: 3.1.0
+info:
+  title: SKB Partner Integration API
+  version: 1.0.0
+  summary: API pertukaran data penanganan kasus lintas instansi.
+  description: |
+    SKB adalah hub API-first untuk pertukaran data kasus, asesmen, intervensi,
+    pemantauan, dan terminasi dari aplikasi mitra tepercaya.
+
+    Semua endpoint partner (kecuali health) membutuhkan HMAC-SHA256 request
+    signing. Aplikasi sumber diidentifikasi oleh `X-SKB-Key-Id`; manusia yang
+    melakukan tindakan dikirim melalui header actor.
+  contact:
+    name: Tim Integrasi SKB
+    email: integrasi-skb@example.go.id
+  license:
+    name: Proprietary - Government Partner Use
+servers:
+  - url: https://sandbox-api.skb.example.go.id/api/v1
+    description: Sandbox dengan data fiktif
+  - url: https://api.skb.example.go.id/api/v1
+    description: Production
+  - url: http://127.0.0.1:8000/api/v1
+    description: Local development
+tags:
+  - name: Connectivity
+  - name: Cases
+paths:
+  /health:
+    get:
+      tags: [Connectivity]
+      operationId: health
+      summary: Memeriksa ketersediaan API
+      security: []
+      responses:
+        '200':
+          description: API tersedia
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  service: { type: string, example: skb-api }
+                  version: { type: string, example: v1 }
+                  time: { type: string, format: date-time }
+  /integrations/me:
+    get:
+      tags: [Connectivity]
+      operationId: integrationIdentity
+      summary: Memeriksa kredensial, scope, dan actor
+      description: Membutuhkan scope `connection:test`.
+      security: [{ signedRequest: [] }]
+      parameters:
+        - $ref: '#/components/parameters/KeyId'
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Nonce'
+        - $ref: '#/components/parameters/Signature'
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/ActorId'
+        - $ref: '#/components/parameters/ActorName'
+        - $ref: '#/components/parameters/ActorRole'
+        - $ref: '#/components/parameters/ActorInstitution'
+      responses:
+        '200':
+          description: Identitas client dan actor
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /integrations/echo:
+    post:
+      tags: [Connectivity]
+      operationId: integrationEcho
+      summary: Menguji signature dan request body
+      description: Membutuhkan scope `connection:test`. Gunakan data fiktif saja.
+      security: [{ signedRequest: [] }]
+      parameters:
+        - $ref: '#/components/parameters/KeyId'
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Nonce'
+        - $ref: '#/components/parameters/Signature'
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/ActorId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+            example:
+              message: test-koneksi
+      responses:
+        '200':
+          description: Signature dan koneksi valid
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /integrations/cases/{externalCaseId}:
+    parameters:
+      - name: externalCaseId
+        in: path
+        required: true
+        description: ID kasus/klien yang stabil pada aplikasi sumber.
+        schema: { type: string, maxLength: 191 }
+      - $ref: '#/components/parameters/KeyId'
+      - $ref: '#/components/parameters/Timestamp'
+      - $ref: '#/components/parameters/Nonce'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/ActorId'
+      - $ref: '#/components/parameters/ActorName'
+      - $ref: '#/components/parameters/ActorRole'
+      - $ref: '#/components/parameters/ActorInstitution'
+    put:
+      tags: [Cases]
+      operationId: upsertCaseBundle
+      summary: Membuat atau memperbarui snapshot kasus
+      description: |
+        Membutuhkan scope `cases:write`. `sync_scope=full` mengganti seluruh
+        snapshot termasuk intervensi. `sync_scope=case_profile` hanya mengganti
+        identifikasi, pihak terkait, riwayat kejadian, dan asesmen.
+      security: [{ signedRequest: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CaseBundle'
+            examples:
+              profile:
+                summary: Sinkronisasi profil kasus
+                value:
+                  schema_version: '1.0'
+                  sync_scope: case_profile
+                  source_version: '20260620120000'
+                  source_updated_at: '2026-06-20T12:00:00+07:00'
+                  case:
+                    registration_number: REG-2026-001
+                    client_number: CLI-2026-001
+                    status: aktif
+                    reported_at: '2026-06-20'
+                    occurred_at: '2026-06-19'
+                    occurred_at_estimated: false
+                    summary: Data fiktif untuk sandbox.
+                    active_intervention_cycle: 1
+                  people: []
+                  event_histories: []
+                  assessments: []
+      responses:
+        '200': { description: Snapshot diperbarui }
+        '201': { description: Snapshot dibuat }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    get:
+      tags: [Cases]
+      operationId: getCaseBundle
+      summary: Membaca snapshot kasus milik aplikasi sumber
+      description: Membutuhkan scope `cases:read`.
+      security: [{ signedRequest: [] }]
+      responses:
+        '200':
+          description: Snapshot kasus
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+components:
+  securitySchemes:
+    signedRequest:
+      type: apiKey
+      in: header
+      name: X-SKB-Signature
+      description: |
+        Base64 HMAC-SHA256 dari canonical request:
+        METHOD, PATH, QUERY, TIMESTAMP, NONCE, IDEMPOTENCY_KEY, SHA256(BODY),
+        masing-masing dipisahkan newline.
+  parameters:
+    KeyId:
+      name: X-SKB-Key-Id
+      in: header
+      required: true
+      schema: { type: string, example: instansi-a-sandbox-v1 }
+    Timestamp:
+      name: X-SKB-Timestamp
+      in: header
+      required: true
+      schema: { type: string, pattern: '^[0-9]+$', example: '1781928000' }
+    Nonce:
+      name: X-SKB-Nonce
+      in: header
+      required: true
+      schema: { type: string, minLength: 16, maxLength: 128 }
+    Signature:
+      name: X-SKB-Signature
+      in: header
+      required: true
+      schema: { type: string }
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: true
+      schema: { type: string, format: uuid }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 16, maxLength: 128 }
+    ActorId:
+      name: X-SKB-Actor-Id
+      in: header
+      required: false
+      description: ID pengguna manusia pada aplikasi sumber.
+      schema: { type: string, maxLength: 191 }
+    ActorName:
+      name: X-SKB-Actor-Name
+      in: header
+      required: false
+      schema: { type: string }
+    ActorRole:
+      name: X-SKB-Actor-Role
+      in: header
+      required: false
+      schema: { type: string }
+    ActorInstitution:
+      name: X-SKB-Actor-Institution
+      in: header
+      required: false
+      schema: { type: string }
+  schemas:
+    CaseBundle:
+      type: object
+      required: [schema_version, case]
+      properties:
+        schema_version: { type: string, const: '1.0' }
+        sync_scope: { type: string, enum: [full, case_profile], default: full }
+        source_version: { type: [string, 'null'], maxLength: 100 }
+        source_updated_at: { type: [string, 'null'], format: date-time }
+        case: { $ref: '#/components/schemas/Case' }
+        people:
+          type: array
+          items: { $ref: '#/components/schemas/Person' }
+        event_histories:
+          type: array
+          items: { $ref: '#/components/schemas/EventHistory' }
+        assessments:
+          type: array
+          items: { $ref: '#/components/schemas/Assessment' }
+        interventions:
+          type: array
+          items: { type: object, additionalProperties: true }
+        terminations:
+          type: array
+          items: { type: object, additionalProperties: true }
+    Case:
+      type: object
+      properties:
+        registration_number: { type: [string, 'null'] }
+        client_number: { type: [string, 'null'] }
+        status: { type: [string, 'null'] }
+        reported_at: { type: [string, 'null'], format: date }
+        occurred_at: { type: [string, 'null'], format: date }
+        occurred_at_estimated: { type: boolean }
+        summary: { type: [string, 'null'] }
+        location: { type: [object, 'null'], additionalProperties: true }
+        classifications: { type: [object, 'null'], additionalProperties: true }
+        active_intervention_cycle: { type: integer, minimum: 1 }
+    Person:
+      type: object
+      required: [role, identity]
+      properties:
+        source_id: { type: [string, 'null'] }
+        role: { type: string, enum: [reporter, victim, respondent] }
+        identity: { type: object, additionalProperties: true }
+    EventHistory:
+      type: object
+      required: [description]
+      properties:
+        source_id: { type: [string, 'null'] }
+        event_date: { type: [string, 'null'], format: date }
+        event_time: { type: [string, 'null'], format: time }
+        description: { type: string }
+    Assessment:
+      type: object
+      required: [content]
+      properties:
+        source_id: { type: [string, 'null'] }
+        assessed_at: { type: [string, 'null'], format: date-time }
+        content: { type: object, additionalProperties: true }
+    Problem:
+      type: object
+      required: [type, title, status, detail]
+      properties:
+        type: { type: string, format: uri-reference }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        request_id: { type: [string, 'null'] }
+  responses:
+    Unauthorized:
+      description: Signature atau kredensial tidak valid
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: Scope atau otorisasi tidak mencukupi
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Resource tidak ditemukan
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: Idempotency key dipakai untuk payload berbeda
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ValidationError:
+      description: Payload tidak valid
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
