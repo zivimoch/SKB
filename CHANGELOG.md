@@ -10,6 +10,8 @@
   PHP 8.3.
 - Menambahkan kompatibilitas indeks `utf8mb4` untuk MySQL/MariaDB lama dengan
   batas indeks InnoDB 767 byte.
+- Menyimpan dokumen JSON sebagai `LONGTEXT` agar migration dapat berjalan pada
+  MySQL/MariaDB lama yang belum memiliki tipe kolom native `JSON`.
 
 ### Added
 

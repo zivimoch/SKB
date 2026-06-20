@@ -25,7 +25,7 @@ return new class extends Migration
             $table->string('key_id', 100)->unique();
             $table->string('name');
             $table->string('source_system', 64)->unique();
-            $table->json('scopes');
+            $table->longText('scopes');
             $table->longText('secret_encrypted')->nullable();
             $table->longText('previous_secret_encrypted')->nullable();
             $table->string('environment', 30)->default('sandbox');

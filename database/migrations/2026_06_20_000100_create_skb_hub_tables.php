@@ -21,7 +21,9 @@ return new class extends Migration
             $table->boolean('occurred_at_estimated')->default(false);
             $table->longText('summary_encrypted')->nullable();
             $table->longText('location_encrypted')->nullable();
-            $table->json('classifications')->nullable();
+            // JSON disimpan sebagai teks agar kompatibel dengan MySQL/MariaDB
+            // lama. Service layer tetap melakukan encode/decode secara eksplisit.
+            $table->longText('classifications')->nullable();
             $table->unsignedInteger('active_intervention_cycle')->default(1);
             $table->char('payload_hash', 64);
             $table->timestamp('source_updated_at')->nullable();
@@ -120,7 +122,7 @@ return new class extends Migration
             $table->string('idempotency_key', 120);
             $table->char('request_hash', 64);
             $table->unsignedSmallInteger('response_status');
-            $table->json('response_body');
+            $table->longText('response_body');
             $table->timestamps();
             $table->unique(['client_key_id', 'idempotency_key']);
         });
@@ -135,7 +137,7 @@ return new class extends Migration
             $table->string('request_id', 128)->nullable();
             $table->string('ip_hash', 64)->nullable();
             $table->char('request_hash', 64)->nullable();
-            $table->json('metadata')->nullable();
+            $table->longText('metadata')->nullable();
             $table->timestamp('occurred_at');
             $table->index(['resource_type', 'resource_id']);
             $table->index('occurred_at');
