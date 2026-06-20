@@ -2,6 +2,8 @@
 
 SKB adalah hub API-first untuk pertukaran data penanganan kasus lintas aplikasi dan instansi. Project ini menyediakan Partner API, antarmuka operasional, audit actor, dokumentasi interaktif, serta integrasi awal dengan MokaV2.
 
+Runtime minimum: PHP 8.2 dan Laravel 12.
+
 ## Developer Portal
 
 - Portal: `/developers`

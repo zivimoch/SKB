@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Menurunkan framework ke Laravel 12 dan runtime minimum ke PHP 8.2 untuk
+  kompatibilitas deployment CentOS yang menjalankan PHP 8.2.
+- Menyesuaikan PHPUnit ke versi 11 dan menghapus `laravel/pao` yang membutuhkan
+  PHP 8.3.
+
+### Added
+
 - Developer Portal dan API reference interaktif.
 - Endpoint health, integration identity, dan echo.
 - Registri institution, integration client, external actor, scope, dan identity provider.
