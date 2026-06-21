@@ -32,7 +32,13 @@ class MokaApiClient
         $canonical = implode("\n", [$method, $path, '', $timestamp, $nonce, $idempotency, hash('sha256', $body)]);
         $signature = base64_encode(hash_hmac('sha256', $canonical, $secret, true));
 
-        $response = Http::withOptions(['verify' => config('moka.verify_tls')])
+        $response = Http::withOptions([
+            'verify' => config('moka.verify_tls'),
+            // Laravel 12 memaksa crypto_method TLS 1.2. libcurl lama pada
+            // CentOS 7 dapat bernegosiasi TLS, tetapi tidak lolos pemeriksaan
+            // fitur Guzzle. Nilai null membiarkan libcurl memilih TLS terbaik.
+            'crypto_method' => null,
+        ])
             ->timeout(config('moka.timeout'))
             ->acceptJson()
             ->withHeaders([
