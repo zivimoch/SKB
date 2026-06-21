@@ -46,6 +46,7 @@ class IntegrationCaseApiTest extends TestCase
 
         $case = DB::table('hub_cases')->first();
         $this->assertNotNull($case);
+        $this->assertSame('2026-06-20 10:00:00', $case->source_updated_at);
         $this->assertStringNotContainsString('Rahasia', $case->summary_encrypted);
         $this->assertSame('"Ringkasan Rahasia"', Crypt::decryptString($case->summary_encrypted));
         $this->assertDatabaseCount('hub_cases', 1);

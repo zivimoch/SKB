@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -37,7 +38,7 @@ class CaseBundleService
                 'classifications' => json_encode($caseData['classifications'] ?? [], JSON_THROW_ON_ERROR),
                 'active_intervention_cycle' => $caseData['active_intervention_cycle'] ?? 1,
                 'payload_hash' => hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR)),
-                'source_updated_at' => $payload['source_updated_at'] ?? null,
+                'source_updated_at' => $this->dateTime($payload['source_updated_at'] ?? null),
                 'last_synced_at' => $now,
                 'profile_synced_at' => $scope === 'case_profile'
                     ? $now
@@ -191,7 +192,7 @@ class CaseBundleService
                 'case_id' => $caseId,
                 'source_id' => $item['source_id'] ?? null,
                 'content_encrypted' => $this->encrypt($item['content']),
-                'assessed_at' => $item['assessed_at'] ?? null,
+                'assessed_at' => $this->dateTime($item['assessed_at'] ?? null),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -233,8 +234,8 @@ class CaseBundleService
                         'officer_source_id' => $report['officer_source_id'] ?? null,
                         'status' => $report['status'],
                         'content_encrypted' => $this->encrypt($report['content'] ?? []),
-                        'confirmed_at' => $report['confirmed_at'] ?? null,
-                        'completed_at' => $report['completed_at'] ?? null,
+                        'confirmed_at' => $this->dateTime($report['confirmed_at'] ?? null),
+                        'completed_at' => $this->dateTime($report['completed_at'] ?? null),
                         'created_at' => now(),
                         'updated_at' => now(),
                     ]);
@@ -326,5 +327,10 @@ class CaseBundleService
         }
 
         return json_decode(Crypt::decryptString($value), true, flags: JSON_THROW_ON_ERROR);
+    }
+
+    private function dateTime(mixed $value): ?string
+    {
+        return $value ? Carbon::parse($value)->format('Y-m-d H:i:s') : null;
     }
 }

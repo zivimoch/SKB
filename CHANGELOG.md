@@ -14,6 +14,8 @@
   MySQL/MariaDB lama yang belum memiliki tipe kolom native `JSON`.
 - Membuat timestamp yang diisi aplikasi bersifat nullable pada level skema untuk
   kompatibilitas MySQL lama yang menolak `TIMESTAMP NOT NULL` tanpa default.
+- Menormalisasi datetime ISO-8601 dari aplikasi mitra ke format MySQL sebelum
+  menyimpan source update, asesmen, konfirmasi, dan penyelesaian intervensi.
 
 ### Added
 
