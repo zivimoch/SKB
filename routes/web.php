@@ -5,7 +5,7 @@ use App\Http\Controllers\CaseWorkspaceController;
 use App\Http\Controllers\DeveloperPortalController;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/cases');
+Route::get('/', fn () => redirect()->route('cases.index'));
 Route::get('/developers', [DeveloperPortalController::class, 'index'])->name('developers.index');
 Route::get('/developers/api', [DeveloperPortalController::class, 'apiReference'])->name('developers.api');
 Route::get('/developers/openapi.yaml', [DeveloperPortalController::class, 'openApi'])->name('developers.openapi');

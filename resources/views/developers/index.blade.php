@@ -22,7 +22,7 @@
     <div class="actions">
         <a class="btn alt" href="{{ route('developers.api') }}">Coba API Interaktif</a>
         <a class="btn" href="{{ route('developers.openapi') }}">Unduh OpenAPI</a>
-        <a class="btn" href="/api/v1/health">Cek Status API</a>
+        <a class="btn" href="{{ url('/api/v1/health') }}">Cek Status API</a>
     </div>
 </div></header>
 <main class="wrap">
