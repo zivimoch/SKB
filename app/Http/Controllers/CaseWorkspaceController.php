@@ -55,7 +55,7 @@ class CaseWorkspaceController extends Controller
             'officer_external_ids.*' => ['required', 'uuid'],
         ]);
 
-        $this->moka->createAgenda($row->source_id, [
+        $result = $this->moka->createAgenda($row->source_id, [
             'command_id' => (string) Str::uuid(),
             'title' => $data['title'],
             'scheduled_date' => $data['scheduled_date'],
@@ -63,7 +63,9 @@ class CaseWorkspaceController extends Controller
             'intervention_cycle' => $row->active_intervention_cycle,
             'officer_external_ids' => array_values(array_unique($data['officer_external_ids'])),
             'created_by_external_id' => $request->user()->external_id,
+            'created_by_email' => $request->user()->email,
         ]);
+        $this->rememberMokaIdentity($request, data_get($result, 'data.creator_external_id'));
 
         return redirect()->route('cases.show', $id)->with('status', 'Agenda berhasil dibuat di Moka dan disinkronkan kembali ke SKB.');
     }
@@ -81,9 +83,10 @@ class CaseWorkspaceController extends Controller
             'follow_up_plan' => ['required_if:action,complete', 'nullable', 'string'],
         ]);
 
-        $this->moka->updateReport($reportUuid, [
+        $result = $this->moka->updateReport($reportUuid, [
             'command_id' => (string) Str::uuid(),
             'actor_external_id' => $request->user()->external_id,
+            'actor_email' => $request->user()->email,
             'action' => $data['action'],
             'rejection_reason' => $data['rejection_reason'] ?? null,
             'location' => $data['location'] ?? null,
@@ -91,7 +94,32 @@ class CaseWorkspaceController extends Controller
             'process_result' => $data['process_result'] ?? null,
             'follow_up_plan' => $data['follow_up_plan'] ?? null,
         ]);
+        $this->rememberMokaIdentity($request, data_get($result, 'data.actor_external_id'));
 
         return redirect()->route('cases.show', $id)->with('status', 'Todo berhasil diperbarui di Moka dan disinkronkan kembali.');
+    }
+
+    private function rememberMokaIdentity(Request $request, mixed $externalId): void
+    {
+        if (! is_string($externalId) || ! Str::isUuid($externalId)) {
+            return;
+        }
+
+        $user = $request->user();
+        if ($user->external_id === $externalId) {
+            return;
+        }
+
+        $alreadyUsed = DB::table('users')
+            ->where('external_id', $externalId)
+            ->where('id', '!=', $user->id)
+            ->exists();
+
+        if (! $alreadyUsed) {
+            $user->forceFill([
+                'external_id' => $externalId,
+                'external_system' => 'mokav2',
+            ])->save();
+        }
     }
 }
