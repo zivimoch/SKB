@@ -66,6 +66,7 @@ class CaseWorkspaceController extends Controller
             'created_by_email' => $request->user()->email,
         ]);
         $this->rememberMokaIdentity($request, data_get($result, 'data.creator_external_id'));
+        $this->applyMokaBundle($row->source_id, data_get($result, 'data.case_bundle'));
 
         return redirect()->route('cases.show', $id)->with('status', 'Agenda berhasil dibuat di Moka dan disinkronkan kembali ke SKB.');
     }
@@ -95,8 +96,18 @@ class CaseWorkspaceController extends Controller
             'follow_up_plan' => $data['follow_up_plan'] ?? null,
         ]);
         $this->rememberMokaIdentity($request, data_get($result, 'data.actor_external_id'));
+        $this->applyMokaBundle($row->source_id, data_get($result, 'data.case_bundle'));
 
         return redirect()->route('cases.show', $id)->with('status', 'Todo berhasil diperbarui di Moka dan disinkronkan kembali.');
+    }
+
+    private function applyMokaBundle(string $sourceId, mixed $bundle): void
+    {
+        if (! is_array($bundle)) {
+            throw new \RuntimeException('Moka tidak mengembalikan snapshot kasus terbaru.');
+        }
+
+        $this->cases->upsert('mokav2', $sourceId, $bundle);
     }
 
     private function rememberMokaIdentity(Request $request, mixed $externalId): void
