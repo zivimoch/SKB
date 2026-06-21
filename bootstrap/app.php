@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\RequireIntegrationScope;
 use App\Http\Middleware\VerifyIntegrationSignature;
+use App\Http\Middleware\VerifySpreadsheetExportToken;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -21,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'integration.signature' => VerifyIntegrationSignature::class,
             'integration.scope' => RequireIntegrationScope::class,
+            'spreadsheet.export' => VerifySpreadsheetExportToken::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

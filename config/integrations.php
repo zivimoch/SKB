@@ -3,6 +3,7 @@
 return [
     'clock_skew_seconds' => (int) env('INTEGRATION_CLOCK_SKEW_SECONDS', 300),
     'nonce_ttl_seconds' => (int) env('INTEGRATION_NONCE_TTL_SECONDS', 600),
+    'spreadsheet_export_token' => env('SPREADSHEET_EXPORT_TOKEN'),
 
     'clients' => [
         env('MOKA_INTEGRATION_KEY_ID', 'moka-v1') => [
