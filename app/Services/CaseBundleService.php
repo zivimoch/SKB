@@ -128,6 +128,39 @@ class CaseBundleService
         ];
     }
 
+    public function interventionFeed(string $sourceSystem, string $sourceId): ?array
+    {
+        $case = DB::table('hub_cases')
+            ->where('source_system', $sourceSystem)
+            ->where('source_id', $sourceId)
+            ->whereNull('deleted_at')
+            ->first();
+
+        if (! $case) {
+            return null;
+        }
+
+        $cycles = collect($this->readInterventions($case->id))
+            ->map(function (array $cycle) use ($sourceSystem): array {
+                $cycle['activities'] = collect($cycle['activities'])
+                    ->reject(fn (array $activity): bool => $activity['origin_system'] === $sourceSystem)
+                    ->values()
+                    ->all();
+                unset($cycle['monitoring_evaluation']);
+
+                return $cycle;
+            })
+            ->filter(fn (array $cycle): bool => $cycle['activities'] !== [])
+            ->values()
+            ->all();
+
+        return [
+            'case_source_id' => $case->source_id,
+            'excluded_origin_system' => $sourceSystem,
+            'interventions' => $cycles,
+        ];
+    }
+
     public function createActivity(string $caseId, User $creator, array $data): string
     {
         return DB::transaction(function () use ($caseId, $creator, $data): string {

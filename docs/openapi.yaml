@@ -208,6 +208,34 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/ValidationError' }
+  /integrations/cases/{externalCaseId}/interventions:
+    parameters:
+      - name: externalCaseId
+        in: path
+        required: true
+        description: ID kasus/klien yang stabil pada aplikasi pemanggil.
+        schema: { type: string, maxLength: 191 }
+      - $ref: '#/components/parameters/KeyId'
+      - $ref: '#/components/parameters/Timestamp'
+      - $ref: '#/components/parameters/Nonce'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/ActorId'
+    get:
+      tags: [Cases]
+      operationId: getExternalCaseInterventions
+      summary: Membaca intervensi yang berasal dari sistem lain
+      description: |
+        Membutuhkan scope `interventions:read`. SKB otomatis mengecualikan
+        activity dengan `origin_system` yang sama dengan aplikasi pemanggil.
+        Dengan demikian aplikasi tidak mengunduh kembali intervensinya sendiri.
+      security: [{ signedRequest: [] }]
+      responses:
+        '200':
+          description: Siklus dan activity intervensi dari sistem lain
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
 components:
   securitySchemes:
     signedRequest:

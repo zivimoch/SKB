@@ -92,6 +92,24 @@ class IntegrationCaseController extends Controller
         return response()->json(['data' => $case]);
     }
 
+    public function interventions(Request $request, string $externalCaseId): JsonResponse
+    {
+        $client = $request->attributes->get('integration_client');
+        $actor = $request->attributes->get('integration_actor');
+        $feed = $this->cases->interventionFeed($client['source_system'], $externalCaseId);
+
+        if (! $feed) {
+            return response()->json(['message' => 'Data kasus tidak ditemukan.'], 404);
+        }
+
+        $this->audit($request, 'case.interventions.read', $externalCaseId, null, [
+            'actor' => $actor,
+            'excluded_origin_system' => $client['source_system'],
+        ]);
+
+        return response()->json(['data' => $feed]);
+    }
+
     private function rules(): array
     {
         return [

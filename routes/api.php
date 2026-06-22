@@ -19,4 +19,6 @@ Route::prefix('v1')->middleware(['integration.signature', 'throttle:integration'
         ->middleware('integration.scope:cases:write');
     Route::get('/integrations/cases/{externalCaseId}', [IntegrationCaseController::class, 'show'])
         ->middleware('integration.scope:cases:read');
+    Route::get('/integrations/cases/{externalCaseId}/interventions', [IntegrationCaseController::class, 'interventions'])
+        ->middleware('integration.scope:interventions:read');
 });

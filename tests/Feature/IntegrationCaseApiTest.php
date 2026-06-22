@@ -127,6 +127,13 @@ class IntegrationCaseApiTest extends TestCase
                 $officerExternalId
             );
 
+        $this->signedInterventionsGet('client-hub-1')
+            ->assertOk()
+            ->assertJsonPath('data.excluded_origin_system', 'mokav2')
+            ->assertJsonCount(1, 'data.interventions')
+            ->assertJsonCount(1, 'data.interventions.0.activities')
+            ->assertJsonPath('data.interventions.0.activities.0.origin_system', 'skb');
+
         $this->assertDatabaseHas('intervention_activities', ['origin_system' => 'skb']);
         $this->assertDatabaseCount('case_integration_officers', 1);
     }
@@ -192,6 +199,21 @@ class IntegrationCaseApiTest extends TestCase
             $path,
             '',
             'test-read-'.str_replace('-', '', (string) Str::uuid()),
+            (string) time(),
+            (string) Str::uuid()
+        );
+
+        return $this->call('GET', $path, [], [], [], $this->server($headers));
+    }
+
+    private function signedInterventionsGet(string $externalId)
+    {
+        $path = '/api/v1/integrations/cases/'.$externalId.'/interventions';
+        $headers = $this->headers(
+            'GET',
+            $path,
+            '',
+            'test-interventions-'.str_replace('-', '', (string) Str::uuid()),
             (string) time(),
             (string) Str::uuid()
         );
