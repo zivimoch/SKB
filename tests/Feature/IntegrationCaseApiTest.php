@@ -29,7 +29,7 @@ class IntegrationCaseApiTest extends TestCase
                 'institution_code' => 'test-instansi',
                 'institution_name' => 'Instansi Test',
                 'environment' => 'sandbox',
-                'scopes' => ['connection:test', 'cases:read', 'cases:write'],
+                'scopes' => ['connection:test', 'cases:read', 'cases:write', 'interventions:read'],
                 'secret' => $this->secret,
                 'previous_secret' => null,
                 'active' => true,
