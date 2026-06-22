@@ -20,14 +20,14 @@ class OperationalUsersSeeder extends Seeder
 
         $users = [
             [
-                'external_id' => '35a1e5db-7ead-43ca-a326-2e2b4d5ffa327',
+                'external_id' => '6827f662-4f7f-4686-93b1-edc0b1104e52',
                 'external_system' => 'mokav2',
                 'name' => 'Alex Ferguson',
                 'email' => 'mk@moka.ol',
                 'role' => 'Manajer Kasus',
             ],
             [
-                'external_id' => '35a1e5db-7ead-43ca-a326-2e2b4d5ffa329',
+                'external_id' => '060877b0-cb76-445c-8d56-c8283261b118',
                 'external_system' => 'mokav2',
                 'name' => 'John Constantine',
                 'email' => 'paralegal@moka.ol',
