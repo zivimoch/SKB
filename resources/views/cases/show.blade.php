@@ -38,8 +38,8 @@
         <div class="grid form-grid"><label>Tanggal<input type="date" name="scheduled_date" value="{{ now()->toDateString() }}" required></label><label>Waktu<input type="time" name="scheduled_time" value="09:00" required></label></div>
         <label>Judul kegiatan<textarea name="title" required></textarea></label>
         <label>Petugas<select name="officer_external_ids[]" multiple size="5" required>@foreach($officers as $officer)<option value="{{ $officer->source_id }}">{{ $officer->name }} — {{ $officer->role }}</option>@endforeach</select></label>
-        <p class="muted">Agenda dibuat lebih dahulu di MokaV2, kemudian snapshot terbaru otomatis dikirim kembali ke SKB.</p>
-        <button class="btn btn-primary">Simpan Agenda</button>
+        <p class="muted">Intervensi disimpan di hub SKB. Aplikasi sumber dapat mengambilnya melalui API sesuai kewenangan.</p>
+        <button class="btn btn-primary">Simpan Intervensi</button>
     </form>
 </dialog>
 @endsection

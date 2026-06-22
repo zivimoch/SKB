@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
+use App\Services\CaseBundleService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
@@ -82,6 +84,53 @@ class IntegrationCaseApiTest extends TestCase
         ]);
     }
 
+    public function test_skb_interventions_are_exposed_and_preserved_when_source_resyncs(): void
+    {
+        $officerExternalId = (string) Str::uuid();
+        $payload = $this->payload();
+        $payload['officers'] = [[
+            'source_id' => $officerExternalId,
+            'name' => 'Petugas Uji',
+            'email' => 'petugas@example.test',
+            'role' => 'Manajer Kasus',
+            'institution' => 'Instansi Test',
+        ]];
+
+        $this->signedPost('client-hub-1', $payload, 'test-hub-sync-0001')->assertCreated();
+
+        $case = DB::table('hub_cases')->where('source_id', 'client-hub-1')->first();
+        $user = User::factory()->create([
+            'external_id' => $officerExternalId,
+            'external_system' => 'mokav2',
+            'name' => 'Petugas Uji',
+            'email' => 'petugas@example.test',
+            'role' => 'Manajer Kasus',
+            'active' => true,
+        ]);
+
+        app(CaseBundleService::class)->createActivity($case->id, $user, [
+            'title' => 'Intervensi dari SKB',
+            'scheduled_date' => '2026-06-22',
+            'scheduled_time' => '09:00:00',
+            'intervention_cycle' => 1,
+            'officer_external_ids' => [$officerExternalId],
+        ]);
+
+        $this->signedPost('client-hub-1', $payload, 'test-hub-sync-0002')->assertOk();
+
+        $this->signedGet('client-hub-1')
+            ->assertOk()
+            ->assertJsonPath('data.interventions.0.activities.0.origin_system', 'skb')
+            ->assertJsonPath('data.interventions.0.activities.0.title', 'Intervensi dari SKB')
+            ->assertJsonPath(
+                'data.interventions.0.activities.0.reports.0.officer_source_id',
+                $officerExternalId
+            );
+
+        $this->assertDatabaseHas('intervention_activities', ['origin_system' => 'skb']);
+        $this->assertDatabaseCount('case_integration_officers', 1);
+    }
+
     public function test_replayed_nonce_and_invalid_signature_are_rejected(): void
     {
         $payload = $this->payload();
@@ -133,6 +182,21 @@ class IntegrationCaseApiTest extends TestCase
         );
 
         return $this->call('POST', $path, [], [], [], $this->server($headers), $body);
+    }
+
+    private function signedGet(string $externalId)
+    {
+        $path = '/api/v1/integrations/cases/'.$externalId;
+        $headers = $this->headers(
+            'GET',
+            $path,
+            '',
+            'test-read-'.str_replace('-', '', (string) Str::uuid()),
+            (string) time(),
+            (string) Str::uuid()
+        );
+
+        return $this->call('GET', $path, [], [], [], $this->server($headers));
     }
 
     private function headers(

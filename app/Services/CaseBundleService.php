@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 class CaseBundleService
 {
@@ -53,8 +55,8 @@ class CaseBundleService
         $this->replaceEventHistories($caseId, $payload['event_histories'] ?? []);
         $this->replaceAssessments($caseId, $payload['assessments'] ?? []);
         if ($scope === 'full') {
-            $this->syncOfficers($sourceSystem, $payload['officers'] ?? []);
-            $this->replaceInterventions($caseId, $payload['interventions'] ?? []);
+            $this->syncOfficers($caseId, $sourceSystem, $payload['officers'] ?? []);
+            $this->replaceInterventions($caseId, $payload['interventions'] ?? [], $sourceSystem);
             $this->replaceTerminations($caseId, $payload['terminations'] ?? []);
         }
 
@@ -126,6 +128,143 @@ class CaseBundleService
         ];
     }
 
+    public function createActivity(string $caseId, User $creator, array $data): string
+    {
+        return DB::transaction(function () use ($caseId, $creator, $data): string {
+            $case = DB::table('hub_cases')->where('id', $caseId)->whereNull('deleted_at')->first();
+            if (! $case) {
+                throw new RuntimeException('Kasus SKB tidak ditemukan.');
+            }
+
+            $cycle = DB::table('intervention_cycles')
+                ->where('case_id', $caseId)
+                ->where('cycle_number', $data['intervention_cycle'])
+                ->first();
+            $cycleId = $cycle->id ?? (string) Str::uuid();
+            DB::table('intervention_cycles')->updateOrInsert(
+                ['case_id' => $caseId, 'cycle_number' => $data['intervention_cycle']],
+                [
+                    'id' => $cycleId,
+                    'status' => 'active',
+                    'created_at' => $cycle->created_at ?? now(),
+                    'updated_at' => now(),
+                ]
+            );
+
+            $officers = DB::table('integration_officers as officer')
+                ->join('case_integration_officers as assignment', 'assignment.officer_id', '=', 'officer.id')
+                ->where('assignment.case_id', $caseId)
+                ->where('officer.source_system', $case->source_system)
+                ->whereIn('officer.source_id', $data['officer_external_ids'])
+                ->where('officer.active', true)
+                ->select('officer.*')
+                ->get();
+            if ($officers->count() !== count(array_unique($data['officer_external_ids']))) {
+                throw new RuntimeException('Satu atau lebih petugas tidak tersedia pada kasus ini.');
+            }
+
+            $activityId = (string) Str::uuid();
+            DB::table('intervention_activities')->insert([
+                'id' => $activityId,
+                'cycle_id' => $cycleId,
+                'source_id' => $activityId,
+                'origin_system' => 'skb',
+                'created_by' => $creator->id,
+                'title_encrypted' => $this->encrypt($data['title']),
+                'scheduled_date' => $data['scheduled_date'],
+                'scheduled_time' => $data['scheduled_time'],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            foreach ($officers as $officer) {
+                $reportId = (string) Str::uuid();
+                DB::table('intervention_reports')->insert([
+                    'id' => $reportId,
+                    'activity_id' => $activityId,
+                    'source_id' => $reportId,
+                    'officer_source_id' => $officer->source_id,
+                    'status' => 'pending',
+                    'content_encrypted' => $this->encrypt([
+                        'officer' => [
+                            'name' => $officer->name,
+                            'position' => $officer->role,
+                            'institution' => $officer->institution,
+                        ],
+                        'requester' => [
+                            'source_id' => $creator->external_id,
+                            'name' => $creator->name,
+                            'position' => $creator->role,
+                        ],
+                        'services' => [],
+                    ]),
+                    'confirmed_at' => null,
+                    'completed_at' => null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            DB::table('hub_cases')->where('id', $caseId)->update([
+                'active_intervention_cycle' => max(
+                    (int) $case->active_intervention_cycle,
+                    (int) $data['intervention_cycle']
+                ),
+                'last_synced_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            return $activityId;
+        });
+    }
+
+    public function updateReport(string $caseId, string $reportSourceId, User $actor, array $data): void
+    {
+        DB::transaction(function () use ($caseId, $reportSourceId, $actor, $data): void {
+            $report = DB::table('intervention_reports as report')
+                ->join('intervention_activities as activity', 'activity.id', '=', 'report.activity_id')
+                ->join('intervention_cycles as cycle', 'cycle.id', '=', 'activity.cycle_id')
+                ->where('cycle.case_id', $caseId)
+                ->where('report.source_id', $reportSourceId)
+                ->select('report.*', 'activity.scheduled_date', 'activity.scheduled_time')
+                ->first();
+            if (! $report) {
+                throw new RuntimeException('Todo SKB tidak ditemukan.');
+            }
+            if ((string) $report->officer_source_id !== (string) $actor->external_id) {
+                throw new RuntimeException('Todo hanya dapat diproses oleh petugas pemiliknya.');
+            }
+
+            $content = $this->decrypt($report->content_encrypted) ?: [];
+            $updates = ['updated_at' => now()];
+            if ($data['action'] === 'accept') {
+                $updates += ['status' => 'accepted', 'confirmed_at' => now()];
+                unset($content['rejection_reason']);
+            } elseif ($data['action'] === 'reject') {
+                $updates += ['status' => 'rejected', 'confirmed_at' => now(), 'completed_at' => null];
+                $content['rejection_reason'] = $data['rejection_reason'];
+            } else {
+                $completedAt = Carbon::parse($report->scheduled_date.' '.$data['completed_time']);
+                $updates += [
+                    'status' => 'done',
+                    'confirmed_at' => $report->confirmed_at ?: now(),
+                    'completed_at' => $completedAt,
+                ];
+                unset($content['rejection_reason']);
+                $content['location'] = $data['location'];
+                $content['process_and_result'] = $data['process_result'];
+                $content['follow_up_plan'] = $data['follow_up_plan'];
+            }
+            $updates['content_encrypted'] = $this->encrypt($content);
+
+            DB::table('intervention_reports')->where('id', $report->id)->update($updates);
+            DB::table('hub_cases')->where('id', $caseId)->update([
+                'last_synced_at' => now(),
+                'updated_at' => now(),
+            ]);
+        });
+    }
+
     private function replacePeople(string $caseId, array $people): void
     {
         DB::table('case_people')->where('case_id', $caseId)->delete();
@@ -143,8 +282,9 @@ class CaseBundleService
         }
     }
 
-    private function syncOfficers(string $sourceSystem, array $officers): void
+    private function syncOfficers(string $caseId, string $sourceSystem, array $officers): void
     {
+        $officerIds = [];
         foreach ($officers as $officer) {
             $existingId = DB::table('integration_officers')
                 ->where('source_system', $sourceSystem)
@@ -156,6 +296,7 @@ class CaseBundleService
                 [
                     'id' => $existingId ?: (string) Str::uuid(),
                     'name' => $officer['name'],
+                    'email' => $officer['email'] ?? null,
                     'role' => $officer['role'] ?? null,
                     'institution' => $officer['institution'] ?? null,
                     'active' => true,
@@ -163,6 +304,37 @@ class CaseBundleService
                     'updated_at' => now(),
                 ]
             );
+            $officerIds[] = $existingId ?: DB::table('integration_officers')
+                ->where('source_system', $sourceSystem)
+                ->where('source_id', $officer['source_id'])
+                ->value('id');
+
+            if (! empty($officer['email'])) {
+                $localUser = DB::table('users')
+                    ->whereRaw('LOWER(TRIM(email)) = ?', [strtolower(trim($officer['email']))])
+                    ->first();
+                $externalIdUsed = DB::table('users')
+                    ->where('external_id', $officer['source_id'])
+                    ->when($localUser, fn ($query) => $query->where('id', '!=', $localUser->id))
+                    ->exists();
+                if ($localUser && ! $externalIdUsed) {
+                    DB::table('users')->where('id', $localUser->id)->update([
+                        'external_id' => $officer['source_id'],
+                        'external_system' => $sourceSystem,
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
+        }
+
+        DB::table('case_integration_officers')->where('case_id', $caseId)->delete();
+        foreach (array_filter(array_unique($officerIds)) as $officerId) {
+            DB::table('case_integration_officers')->insert([
+                'case_id' => $caseId,
+                'officer_id' => $officerId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
         }
     }
 
@@ -199,33 +371,53 @@ class CaseBundleService
         }
     }
 
-    private function replaceInterventions(string $caseId, array $cycles): void
+    private function replaceInterventions(string $caseId, array $cycles, string $sourceSystem): void
     {
-        DB::table('intervention_cycles')->where('case_id', $caseId)->delete();
         foreach ($cycles as $cycle) {
-            $cycleId = (string) Str::uuid();
-            DB::table('intervention_cycles')->insert([
-                'id' => $cycleId,
-                'case_id' => $caseId,
-                'cycle_number' => $cycle['cycle_number'],
-                'status' => $cycle['status'] ?? 'active',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $existingCycle = DB::table('intervention_cycles')
+                ->where('case_id', $caseId)
+                ->where('cycle_number', $cycle['cycle_number'])
+                ->first();
+            $cycleId = $existingCycle->id ?? (string) Str::uuid();
+            DB::table('intervention_cycles')->updateOrInsert(
+                ['case_id' => $caseId, 'cycle_number' => $cycle['cycle_number']],
+                [
+                    'id' => $cycleId,
+                    'status' => $cycle['status'] ?? 'active',
+                    'created_at' => $existingCycle->created_at ?? now(),
+                    'updated_at' => now(),
+                ]
+            );
+
+            $incomingSourceIds = collect($cycle['activities'] ?? [])->pluck('source_id')->all();
+            $staleActivities = DB::table('intervention_activities')
+                ->where('cycle_id', $cycleId)
+                ->where('origin_system', $sourceSystem);
+            if ($incomingSourceIds !== []) {
+                $staleActivities->whereNotIn('source_id', $incomingSourceIds);
+            }
+            $staleActivities->delete();
 
             foreach ($cycle['activities'] ?? [] as $activity) {
-                $activityId = (string) Str::uuid();
-                DB::table('intervention_activities')->insert([
-                    'id' => $activityId,
-                    'cycle_id' => $cycleId,
-                    'source_id' => $activity['source_id'],
-                    'title_encrypted' => $this->encrypt($activity['title']),
-                    'scheduled_date' => $activity['scheduled_date'] ?? null,
-                    'scheduled_time' => $activity['scheduled_time'] ?? null,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+                $existingActivity = DB::table('intervention_activities')
+                    ->where('cycle_id', $cycleId)
+                    ->where('source_id', $activity['source_id'])
+                    ->first();
+                $activityId = $existingActivity->id ?? (string) Str::uuid();
+                DB::table('intervention_activities')->updateOrInsert(
+                    ['cycle_id' => $cycleId, 'source_id' => $activity['source_id']],
+                    [
+                        'id' => $activityId,
+                        'origin_system' => $sourceSystem,
+                        'title_encrypted' => $this->encrypt($activity['title']),
+                        'scheduled_date' => $activity['scheduled_date'] ?? null,
+                        'scheduled_time' => $activity['scheduled_time'] ?? null,
+                        'created_at' => $existingActivity->created_at ?? now(),
+                        'updated_at' => now(),
+                    ]
+                );
 
+                DB::table('intervention_reports')->where('activity_id', $activityId)->delete();
                 foreach ($activity['reports'] ?? [] as $report) {
                     DB::table('intervention_reports')->insert([
                         'id' => (string) Str::uuid(),
@@ -242,6 +434,7 @@ class CaseBundleService
                 }
             }
 
+            DB::table('monitoring_evaluations')->where('cycle_id', $cycleId)->delete();
             if (! empty($cycle['monitoring_evaluation'])) {
                 $monev = $cycle['monitoring_evaluation'];
                 DB::table('monitoring_evaluations')->insert([
@@ -280,11 +473,21 @@ class CaseBundleService
             ->map(function ($cycle): array {
                 $activities = DB::table('intervention_activities')->where('cycle_id', $cycle->id)->get()
                     ->map(function ($activity): array {
+                        $creator = $activity->created_by
+                            ? DB::table('users')->where('id', $activity->created_by)->first()
+                            : null;
+
                         return [
                             'source_id' => $activity->source_id,
+                            'origin_system' => $activity->origin_system,
                             'title' => $this->decrypt($activity->title_encrypted),
                             'scheduled_date' => $activity->scheduled_date,
                             'scheduled_time' => $activity->scheduled_time,
+                            'requester' => $creator ? [
+                                'source_id' => $creator->external_id,
+                                'name' => $creator->name,
+                                'position' => $creator->role,
+                            ] : null,
                             'reports' => DB::table('intervention_reports')->where('activity_id', $activity->id)->get()
                                 ->map(fn ($report) => [
                                     'source_id' => $report->source_id,

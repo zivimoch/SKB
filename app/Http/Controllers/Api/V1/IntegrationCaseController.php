@@ -117,6 +117,7 @@ class IntegrationCaseController extends Controller
             'officers' => ['nullable', 'array'],
             'officers.*.source_id' => ['required', 'uuid'],
             'officers.*.name' => ['required', 'string', 'max:255'],
+            'officers.*.email' => ['nullable', 'email', 'max:255'],
             'officers.*.role' => ['nullable', 'string', 'max:100'],
             'officers.*.institution' => ['nullable', 'string', 'max:255'],
             'event_histories' => ['nullable', 'array'],
