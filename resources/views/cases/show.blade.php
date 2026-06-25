@@ -60,7 +60,7 @@
 <dialog id="infoDialog"><div class="modal-head"><strong id="infoTitle">Detail</strong><button class="close" onclick="infoDialog.close()">×</button></div><div class="modal-body" id="infoBody"></div></dialog>
 <dialog id="actionDialog"><div class="modal-head"><strong id="actionTitle">Tindak Lanjut</strong><button class="close" onclick="actionDialog.close()">×</button></div><div class="modal-body" id="actionBody"></div></dialog>
 <dialog id="agendaDialog"><div class="modal-head"><strong>Tambah Agenda / Todo</strong><button class="close" onclick="agendaDialog.close()">×</button></div>
-    <form class="modal-body grid" method="post" action="{{ route('cases.agendas.store', $case['id']) }}">
+    <form class="modal-body grid" method="post" action="{{ route('cases.agendas.store', $case['id'], false) }}">
         @csrf
         <div class="grid form-grid"><label>Tanggal<input type="date" name="scheduled_date" value="{{ now()->toDateString() }}" required></label><label>Waktu<input type="time" name="scheduled_time" value="09:00" required></label></div>
         <label>Judul kegiatan<textarea name="title" required></textarea></label>
@@ -72,7 +72,7 @@
 @endsection
 @push('scripts')
 <script>
-let caseData=@json($case);const actorExternal=@json(auth()->user()->external_id);const csrf=@json(csrf_token());const reportActionBase=@json(url('/cases/'.$case['id'].'/reports'));let serviceKeywords=caseData.service_keywords||[];let active=caseData.case.active_intervention_cycle||1;let agendaFilter='all';
+let caseData=@json($case);const actorExternal=@json(auth()->user()->external_id);const csrf=@json(csrf_token());const currentCasePath=window.location.pathname.replace(/\/$/,'');const reportActionBase=`${currentCasePath}/reports`;let serviceKeywords=caseData.service_keywords||[];let active=caseData.case.active_intervention_cycle||1;let agendaFilter='all';
 const esc=v=>String(v??'-').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const sourceLabel=source=>source==='skb'?'SKB':source==='mokav2'?'Moka':String(source||'Tidak diketahui').toUpperCase();
 const sourceClass=source=>source==='skb'?'source-skb':source==='mokav2'?'source-mokav2':'';
