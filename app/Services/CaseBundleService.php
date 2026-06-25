@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -54,6 +55,11 @@ class CaseBundleService
         $this->replacePeople($caseId, $payload['people'] ?? []);
         $this->replaceEventHistories($caseId, $payload['event_histories'] ?? []);
         $this->replaceAssessments($caseId, $payload['assessments'] ?? []);
+        $this->syncServiceKeywords(
+            $sourceSystem,
+            $payload['service_keywords'] ?? [],
+            $scope === 'full' ? ($payload['interventions'] ?? []) : []
+        );
         if ($scope === 'full') {
             $this->syncOfficers($caseId, $sourceSystem, $payload['officers'] ?? []);
             $this->replaceInterventions($caseId, $payload['interventions'] ?? [], $sourceSystem);
@@ -81,6 +87,8 @@ class CaseBundleService
         if (! $case) {
             return null;
         }
+
+        $interventions = $this->readInterventions($case->id);
 
         return [
             'id' => $case->id,
@@ -118,7 +126,8 @@ class CaseBundleService
                 'assessed_at' => $row->assessed_at,
                 'content' => $this->decrypt($row->content_encrypted),
             ])->all(),
-            'interventions' => $this->readInterventions($case->id),
+            'interventions' => $interventions,
+            'service_keywords' => $this->serviceKeywords(),
             'terminations' => DB::table('terminations')->where('case_id', $case->id)->get()->map(fn ($row) => [
                 'source_id' => $row->source_id,
                 'type' => $row->type,
@@ -287,6 +296,15 @@ class CaseBundleService
                 $content['location'] = $data['location'];
                 $content['process_and_result'] = $data['process_result'];
                 $content['follow_up_plan'] = $data['follow_up_plan'];
+                $content['services'] = $this->serviceKeywordsById($data['service_keyword_ids'] ?? [])
+                    ->map(fn ($keyword): array => [
+                        'id' => $keyword->id,
+                        'keyword' => $keyword->keyword,
+                        'jabatan' => $keyword->jabatan,
+                        'jenis_agenda' => $keyword->jenis_agenda,
+                    ])
+                    ->values()
+                    ->all();
             }
             $updates['content_encrypted'] = $this->encrypt($content);
 
@@ -367,6 +385,73 @@ class CaseBundleService
                 'officer_id' => $officerId,
                 'created_at' => now(),
                 'updated_at' => now(),
+            ]);
+        }
+    }
+
+    private function syncServiceKeywords(string $sourceSystem, array $serviceKeywords, array $cycles): void
+    {
+        $items = collect($serviceKeywords)
+            ->merge(
+                collect($cycles)
+                    ->flatMap(fn (array $cycle): array => $cycle['activities'] ?? [])
+                    ->flatMap(fn (array $activity): array => $activity['reports'] ?? [])
+                    ->flatMap(fn (array $report): array => $report['content']['services'] ?? [])
+                    ->all()
+            )
+            ->map(function (mixed $item): array {
+                if (! is_array($item)) {
+                    $item = ['keyword' => $item];
+                }
+
+                return [
+                    'source_id' => $item['source_id'] ?? $item['id'] ?? null,
+                    'jabatan' => $item['jabatan'] ?? null,
+                    'keyword' => $item['keyword'] ?? null,
+                    'jenis_agenda' => $item['jenis_agenda'] ?? 'Layanan',
+                ];
+            })
+            ->filter(fn (array $item): bool => filled($item['keyword']))
+            ->unique(fn (array $item): string => mb_strtolower(
+                (string) ($item['source_id'] ?: (($item['jabatan'] ?? '').'|'.$item['keyword'].'|'.$item['jenis_agenda']))
+            ))
+            ->values();
+
+        foreach ($items as $item) {
+            $sourceId = $item['source_id'] ?: hash('sha256', implode('|', [
+                $item['jabatan'],
+                $item['keyword'],
+                $item['jenis_agenda'],
+            ]));
+            $existing = DB::table('m_keywords')
+                ->where('source_system', $sourceSystem)
+                ->where('source_id', $sourceId)
+                ->first();
+
+            if ($existing) {
+                DB::table('m_keywords')->where('id', $existing->id)->update([
+                    'jabatan' => $item['jabatan'],
+                    'keyword' => $item['keyword'],
+                    'jenis_agenda' => $item['jenis_agenda'] ?: 'Layanan',
+                    'active' => true,
+                    'updated_at' => now(),
+                    'deleted_at' => null,
+                ]);
+
+                continue;
+            }
+
+            DB::table('m_keywords')->insert([
+                'id' => (string) Str::uuid(),
+                'source_system' => $sourceSystem,
+                'source_id' => $sourceId,
+                'jabatan' => $item['jabatan'],
+                'keyword' => $item['keyword'],
+                'jenis_agenda' => $item['jenis_agenda'] ?: 'Layanan',
+                'active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+                'deleted_at' => null,
             ]);
         }
     }
@@ -545,6 +630,40 @@ class CaseBundleService
                     ] : null,
                 ];
             })->all();
+    }
+
+    private function serviceKeywords(): array
+    {
+        return DB::table('m_keywords')
+            ->whereNull('deleted_at')
+            ->where('active', true)
+            ->where('jenis_agenda', 'Layanan')
+            ->orderBy('jabatan')
+            ->orderBy('keyword')
+            ->get(['id', 'jabatan', 'keyword', 'jenis_agenda'])
+            ->map(fn ($keyword): array => (array) $keyword)
+            ->all();
+    }
+
+    private function serviceKeywordsById(array $ids): Collection
+    {
+        $ids = array_values(array_unique(array_filter($ids)));
+
+        if ($ids === []) {
+            return collect();
+        }
+
+        $keywords = DB::table('m_keywords')
+            ->whereIn('id', $ids)
+            ->whereNull('deleted_at')
+            ->where('active', true)
+            ->get(['id', 'jabatan', 'keyword', 'jenis_agenda']);
+
+        if ($keywords->count() !== count($ids)) {
+            throw new RuntimeException('Satu atau lebih detail layanan tidak tersedia.');
+        }
+
+        return $keywords;
     }
 
     private function encrypt(mixed $value): ?string
